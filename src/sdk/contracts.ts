@@ -23,7 +23,10 @@ export const CHESS_ABI = [
 ];
 
 export class ChessSDK {
-    constructor(public contract: ethers.Contract) { }
+    public contract: ethers.Contract;
+    constructor(contract: ethers.Contract) {
+        this.contract = contract;
+    }
 
     static connect(address: string, runner: ethers.ContractRunner): ChessSDK {
         const contract = new ethers.Contract(address, CHESS_ABI, runner);
@@ -44,7 +47,10 @@ export class ChessSDK {
 }
 
 export class GameSDK {
-    constructor(public contract: ethers.Contract) { }
+    public contract: ethers.Contract;
+    constructor(contract: ethers.Contract) {
+        this.contract = contract;
+    }
 
     static connect(address: string, runner: ethers.ContractRunner): GameSDK {
         const contract = new ethers.Contract(address, GAME_ABI, runner);

@@ -1,15 +1,17 @@
 /**
  * Chess piece type constants
  */
-export enum PieceType {
-    Empty = 0,
-    Pawn = 1,
-    Bishop = 2,
-    Knight = 3,
-    Rook = 4,
-    Queen = 5,
-    King = 6,
-}
+export const PieceType = {
+    Empty: 0,
+    Pawn: 1,
+    Bishop: 2,
+    Knight: 3,
+    Rook: 4,
+    Queen: 5,
+    King: 6,
+} as const;
+
+export type PieceType = (typeof PieceType)[keyof typeof PieceType];
 
 /**
  * Encodes a chess move into the 16-bit format used by the smart contract.
