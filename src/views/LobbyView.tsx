@@ -115,6 +115,35 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
         };
     }, []);
 
+    const addNetwork = async () => {
+        if (!window.ethereum) return;
+        setLoading(true);
+        try {
+            await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [
+                    {
+                        chainId: `0x${SUPPORTED_CHAIN_ID.toString(16)}`,
+                        rpcUrls: [import.meta.env.VITE_RPC_URL || 'https://0xrpc.io/hoodi'],
+                        chainName: 'Somnia Testnet', // Customize as needed
+                        nativeCurrency: {
+                            name: 'STT',
+                            symbol: 'STT',
+                            decimals: 18
+                        }
+                    }
+                ]
+            });
+            setIsWrongNetwork(false);
+            connectWallet();
+        } catch (addError) {
+            console.error(addError);
+            setStatus('Failed to add the network.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const switchNetwork = async () => {
         if (!window.ethereum) return;
         setLoading(true);
@@ -130,28 +159,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
             console.error(err);
             // This error code indicates that the chain has not been added to MetaMask.
             if (err.code === 4902) {
-                try {
-                    await window.ethereum.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [
-                            {
-                                chainId: `0x${SUPPORTED_CHAIN_ID.toString(16)}`,
-                                rpcUrls: [import.meta.env.VITE_RPC_URL || 'https://0xrpc.io/hoodi'],
-                                chainName: 'Somnia Testnet', // Customize as needed
-                                nativeCurrency: {
-                                    name: 'STT',
-                                    symbol: 'STT',
-                                    decimals: 18
-                                }
-                            }
-                        ]
-                    });
-                    setIsWrongNetwork(false);
-                    connectWallet();
-                } catch (addError) {
-                    console.error(addError);
-                    setStatus('Failed to add the network.');
-                }
+                await addNetwork();
             } else {
                 setStatus('Failed to switch network.');
             }
@@ -330,13 +338,22 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                         Connect Wallet
                     </button>
                 ) : isWrongNetwork ? (
-                    <button
-                        onClick={switchNetwork}
-                        disabled={loading}
-                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 disabled:opacity-50 rounded-2xl font-bold text-lg shadow-lg shadow-rose-900/30 transition-all active:scale-95"
-                    >
-                        Switch to Supported Network
-                    </button>
+                    <div className="space-y-4">
+                        <button
+                            onClick={switchNetwork}
+                            disabled={loading}
+                            className="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 disabled:opacity-50 rounded-2xl font-bold text-lg shadow-lg shadow-rose-900/30 transition-all active:scale-95"
+                        >
+                            Switch to Supported Network
+                        </button>
+                        <button
+                            onClick={addNetwork}
+                            disabled={loading}
+                            className="w-full py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-2xl font-bold transition-all border border-slate-700"
+                        >
+                            Add Network
+                        </button>
+                    </div>
                 ) : account ? (
                     <div className="space-y-4">
                         {/* Account badge */}
