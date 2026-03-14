@@ -18,6 +18,7 @@ import type { SDK } from '@somnia-chain/reactivity';
 
 const GAME_ADDRESS = import.meta.env.VITE_GAME_CONTRACT_ADDRESS as `0x${string}`;
 const CHESS_ADDRESS = import.meta.env.VITE_CHESS_CONTRACT_ADDRESS as `0x${string}`;
+const SUPPORTED_CHAIN_ID = Number(import.meta.env.VITE_SUPPORTED_CHAIN_ID);
 
 export interface GameContext {
     account: string;
@@ -38,6 +39,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
     const [loading, setLoading] = useState(false);
     const [ctx, setCtx] = useState<GameContext | null>(null);
     const [waitingGameId, setWaitingGameId] = useState<number | null>(null);
+    const [isWrongNetwork, setIsWrongNetwork] = useState(false);
 
     const connectWallet = async () => {
         if (!window.ethereum) {
@@ -50,6 +52,19 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
 
             // Ethers for signing (existing SDK)
             const provider = new ethers.BrowserProvider(window.ethereum);
+
+            const network = await provider.getNetwork();
+            const currentChainId = Number(network.chainId);
+
+            if (currentChainId !== SUPPORTED_CHAIN_ID) {
+                setIsWrongNetwork(true);
+                setStatus('Wrong network. Please switch to the supported chain.');
+                setLoading(false);
+                return;
+            } else {
+                setIsWrongNetwork(false);
+            }
+
             const signer = await provider.getSigner();
             const address = (await signer.getAddress()) as `0x${string}`;
 
@@ -73,6 +88,73 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
         } catch (err) {
             console.error(err);
             setStatus('Connection failed. Try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!window.ethereum) return;
+
+        const handleChainChanged = (chainIdHex: string) => {
+            const newChainId = Number(chainIdHex);
+            if (newChainId !== SUPPORTED_CHAIN_ID) {
+                setIsWrongNetwork(true);
+                setAccount(null);
+                setCtx(null);
+                setStatus('Wrong network. Please switch to the supported chain.');
+            } else {
+                setIsWrongNetwork(false);
+                setStatus('Network switched. You can connect now.');
+            }
+        };
+
+        window.ethereum.on('chainChanged', handleChainChanged);
+        return () => {
+            window.ethereum.removeListener('chainChanged', handleChainChanged);
+        };
+    }, []);
+
+    const switchNetwork = async () => {
+        if (!window.ethereum) return;
+        setLoading(true);
+        try {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${SUPPORTED_CHAIN_ID.toString(16)}` }],
+            });
+            setIsWrongNetwork(false);
+            connectWallet();
+        } catch (error) {
+            const err = error as { code?: number };
+            console.error(err);
+            // This error code indicates that the chain has not been added to MetaMask.
+            if (err.code === 4902) {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [
+                            {
+                                chainId: `0x${SUPPORTED_CHAIN_ID.toString(16)}`,
+                                rpcUrls: [import.meta.env.VITE_RPC_URL || 'https://0xrpc.io/hoodi'],
+                                chainName: 'Somnia Testnet', // Customize as needed
+                                nativeCurrency: {
+                                    name: 'STT',
+                                    symbol: 'STT',
+                                    decimals: 18
+                                }
+                            }
+                        ]
+                    });
+                    setIsWrongNetwork(false);
+                    connectWallet();
+                } catch (addError) {
+                    console.error(addError);
+                    setStatus('Failed to add the network.');
+                }
+            } else {
+                setStatus('Failed to switch network.');
+            }
         } finally {
             setLoading(false);
         }
@@ -239,7 +321,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                     {status}
                 </div>
 
-                {!account ? (
+                {!account && !isWrongNetwork ? (
                     <button
                         onClick={connectWallet}
                         disabled={loading}
@@ -247,7 +329,15 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                     >
                         Connect Wallet
                     </button>
-                ) : (
+                ) : isWrongNetwork ? (
+                    <button
+                        onClick={switchNetwork}
+                        disabled={loading}
+                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 disabled:opacity-50 rounded-2xl font-bold text-lg shadow-lg shadow-rose-900/30 transition-all active:scale-95"
+                    >
+                        Switch to Supported Network
+                    </button>
+                ) : account ? (
                     <div className="space-y-4">
                         {/* Account badge */}
                         <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 px-4 py-3 rounded-2xl">
@@ -274,7 +364,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                             ♟ Join with ID
                         </button>
                     </div>
-                )}
+                ) : null}
 
                 {/* Network badge */}
                 <div className="flex items-center gap-3 pt-2 border-t border-slate-800 text-slate-500 text-sm">
