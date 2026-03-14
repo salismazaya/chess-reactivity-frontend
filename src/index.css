@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+}
+
+.square-light {
+  background-color: #e2e8f0;
+}
+
+.square-dark {
+  background-color: #64748b;
+}
+
+.piece {
+  @apply w-full h-full flex items-center justify-center text-4xl cursor-pointer select-none;
+}
