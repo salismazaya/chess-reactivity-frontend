@@ -304,25 +304,29 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
     }, [ctx, onEnterGame]);
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center px-4">
+        <div className="min-h-screen bg-neo-bg text-black flex flex-col items-center justify-center px-4 py-12">
             {/* Logo */}
             <div className="mb-12 text-center">
-                <h1 className="text-6xl font-black tracking-tight mb-3 bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 bg-clip-text text-transparent">
-                    Chess Reactivity
-                </h1>
-                <p className="text-slate-400 text-lg">
+                <div className="inline-block border-8 border-black bg-neo-yellow p-6 shadow-neo-lg rotate-[-2deg] mb-6">
+                    <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-black">
+                        Chess Reactivity
+                    </h1>
+                </div>
+                <p className="text-black text-2xl font-bold italic">
                     Fully on-chain chess powered by{' '}
-                    <span className="text-indigo-400 font-semibold">Somnia Reactivity</span>
+                    <span className="bg-neo-cyan px-2 border-2 border-black">Somnia Reactivity</span>
                 </p>
             </div>
 
             {/* Card */}
-            <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-white/5 rounded-3xl p-8 shadow-2xl space-y-6">
+            <div className="w-full max-w-md neo-card p-8 space-y-6 bg-white">
+                <h2 className="text-3xl font-black uppercase border-b-4 border-black pb-2 mb-4">Lobby</h2>
+
                 {/* Status */}
                 <div
-                    className={`text-sm px-4 py-3 rounded-xl border transition-colors ${loading
-                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    className={`text-sm px-4 py-3 border-4 border-black font-bold transition-colors ${loading
+                        ? 'bg-neo-cyan'
+                        : 'bg-white'
                         }`}
                 >
                     <span className="font-mono">{loading ? '⏳' : '💬'}</span>{' '}
@@ -333,62 +337,63 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                     <button
                         onClick={connectWallet}
                         disabled={loading}
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-900/30 transition-all active:scale-95"
+                        className="w-full neo-btn-cyan py-6 text-2xl"
                     >
-                        Connect Wallet
+                        CONNECT WALLET
                     </button>
                 ) : isWrongNetwork ? (
                     <div className="space-y-4">
                         <button
                             onClick={switchNetwork}
                             disabled={loading}
-                            className="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 disabled:opacity-50 rounded-2xl font-bold text-lg shadow-lg shadow-rose-900/30 transition-all active:scale-95"
+                            className="w-full neo-btn-pink py-6 text-xl"
                         >
-                            Switch to Supported Network
+                            SWITCH NETWORK
                         </button>
                         <button
                             onClick={addNetwork}
                             disabled={loading}
-                            className="w-full py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-2xl font-bold transition-all border border-slate-700"
+                            className="w-full neo-btn bg-white py-4"
                         >
-                            Add Network
+                            ADD NETWORK
                         </button>
                     </div>
                 ) : account ? (
                     <div className="space-y-4">
                         {/* Account badge */}
-                        <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 px-4 py-3 rounded-2xl">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="font-mono text-sm text-slate-300">
+                        <div className="flex items-center gap-3 bg-white border-4 border-black px-4 py-3">
+                            <div className="w-4 h-4 border-2 border-black bg-neo-lime animate-pulse" />
+                            <span className="font-mono text-sm font-black">
                                 {account.slice(0, 8)}…{account.slice(-6)}
-                                {waitingGameId && <span className="ml-2 text-indigo-400">(Waiting for #${waitingGameId})</span>}
+                                {waitingGameId && <span className="ml-2 bg-neo-yellow px-1 border-2 border-black">(Waiting for #${waitingGameId})</span>}
                             </span>
                         </div>
 
                         <button
                             onClick={createGame}
                             disabled={loading || waitingGameId !== null}
-                            className="w-full py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 rounded-2xl font-bold shadow-lg transition-all active:scale-95"
+                            className="w-full neo-btn-lime py-6 text-2xl uppercase"
                         >
-                            {waitingGameId ? '⏳ Waiting for Player 2...' : '♛ Create Match'}
+                            {waitingGameId ? 'Wait...' : 'Create Match'}
                         </button>
 
                         <button
                             onClick={joinGame}
                             disabled={loading || waitingGameId !== null}
-                            className="w-full py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-2xl font-bold transition-all border border-slate-700"
+                            className="w-full neo-btn-pink py-4 text-xl uppercase"
                         >
-                            ♟ Join with ID
+                            Join ID
                         </button>
                     </div>
                 ) : null}
 
                 {/* Network badge */}
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-800 text-slate-500 text-sm">
-                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-300">H</div>
+                <div className="flex items-center gap-3 pt-6 border-t-4 border-black text-black font-bold text-lg">
+                    <div className="w-8 h-8 bg-neo-yellow border-4 border-black flex items-center justify-center font-black text-sm">H</div>
                     <span>Somnia Testnet</span>
                 </div>
             </div>
         </div>
+
     );
 }

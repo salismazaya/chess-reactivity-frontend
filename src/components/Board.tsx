@@ -63,13 +63,18 @@ export function Board({ gameState, player1Turn, onMove, disabled, myColor }: Boa
         if (currentKingSquare) {
             if (game.isCheckmate()) {
                 optionSquaresPersist.current[currentKingSquare] = {
-                    background: "rgba(161, 11, 33, 1)",
+                    background: "#FF0000",
+                    border: "4px solid black",
+                    boxSizing: "border-box"
                 };
             } else if (game.isCheck()) {
                 optionSquaresPersist.current[currentKingSquare] = {
-                    background: "rgba(187, 11, 33, 0.7)",
+                    background: "#FF69B4",
+                    border: "4px solid black",
+                    boxSizing: "border-box"
                 };
             }
+
         }
 
         setOptionSquares(optionSquaresPersist.current);
@@ -94,17 +99,20 @@ export function Board({ gameState, player1Turn, onMove, disabled, myColor }: Boa
                 background:
                     game.get(move.to as Square) &&
                         game.get(move.to as Square)?.color !== game.get(square as Square)?.color
-                        ? "radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)"
-                        : "radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)",
+                        ? "radial-gradient(circle, rgba(0,0,0,.4) 85%, transparent 15%)"
+                        : "radial-gradient(circle, rgba(0,0,0,.4) 25%, transparent 25%)",
                 borderRadius: "50%",
             };
         }
 
         newSquares[square] = {
-            background: "rgba(255, 255, 0, 0.4)",
+            background: "#00FFFF", // Bright cyan
+            border: "4px solid black",
+            boxSizing: "border-box"
         };
 
         setOptionSquares({ ...optionSquaresPersist.current, ...newSquares });
+
 
         return true;
     }
@@ -190,12 +198,13 @@ export function Board({ gameState, player1Turn, onMove, disabled, myColor }: Boa
                     boardOrientation: orientation,
                     allowDragging: false,
                     showAnimations: true,
-                    darkSquareStyle: { backgroundColor: '#1e293b' },
-                    lightSquareStyle: { backgroundColor: '#cbd5e1' },
+                    darkSquareStyle: { backgroundColor: '#FF69B4' },
+                    lightSquareStyle: { backgroundColor: '#FFFFFF' },
                     squareStyles: optionSquares,
-                    animationDurationInMs: 300,
+                    animationDurationInMs: 200,
                 }}
             />
         </div>
+
     );
 }
