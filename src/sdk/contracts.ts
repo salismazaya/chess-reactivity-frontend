@@ -11,6 +11,8 @@ export const GAME_ABI = [
     "function move(uint256 gId, uint16 moveValue) public",
     "function getGame(uint256 gId) public view returns (uint256 gameState, address player1, address player2, bool player1Turn)",
     "function getMoves(uint256 gId) public view returns (uint16[] memory)",
+    "function authorize(address session) public",
+    "function sessionToMain(address session) public view returns (address)",
 ];
 
 export const CHESS_ABI = [
@@ -75,5 +77,13 @@ export class GameSDK {
 
     async getMoves(gameId: bigint | number): Promise<number[]> {
         return await this.contract.getMoves(gameId);
+    }
+
+    async authorize(session: string): Promise<ethers.ContractTransactionResponse> {
+        return await this.contract.authorize(session);
+    }
+
+    async sessionToMain(session: string): Promise<string> {
+        return await this.contract.sessionToMain(session);
     }
 }

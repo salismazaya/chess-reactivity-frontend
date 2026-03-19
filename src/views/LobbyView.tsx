@@ -5,9 +5,10 @@ declare global {
     }
 }
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { GameSDK, ChessSDK } from '../sdk';
+import { sessionWallet } from '../lib/sessionWallet';
+import { ChessSDK, GameSDK } from '../sdk/contracts';
 import {
     createSomniaPublicClient,
     createSomniaWalletClient,
@@ -15,7 +16,6 @@ import {
 } from '../lib/reactivityClient';
 import type { PublicClient, WalletClient } from 'viem';
 import type { SDK } from '@somnia-chain/reactivity';
-
 const GAME_ADDRESS = import.meta.env.VITE_GAME_CONTRACT_ADDRESS as `0x${string}`;
 const CHESS_ADDRESS = import.meta.env.VITE_CHESS_CONTRACT_ADDRESS as `0x${string}`;
 const SUPPORTED_CHAIN_ID = Number(import.meta.env.VITE_SUPPORTED_CHAIN_ID);
@@ -27,6 +27,7 @@ export interface GameContext {
     reactivitySDK: SDK;
     publicClient: PublicClient;
     walletClient: WalletClient;
+    mainSigner: ethers.Signer;
 }
 
 interface LobbyViewProps {
@@ -44,7 +45,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
     const connectWallet = async () => {
         if (!window.ethereum) {
             setStatus('Please install MetaMask.');
-            return;
+            return null;
         }
         try {
             setLoading(true);
@@ -60,13 +61,19 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                 setIsWrongNetwork(true);
                 setStatus('Wrong network. Please switch to the supported chain.');
                 setLoading(false);
-                return;
+                return null;
             } else {
                 setIsWrongNetwork(false);
             }
 
             const signer = await provider.getSigner();
             const address = (await signer.getAddress()) as `0x${string}`;
+
+            // Session Wallet logic
+            let sessionSigner = sessionWallet.connect(provider);
+            if (!sessionSigner) {
+                sessionSigner = sessionWallet.create().connect(provider);
+            }
 
             // Viem clients for Reactivity SDK
             const publicClient = createSomniaPublicClient();
@@ -75,19 +82,105 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
 
             const newCtx: GameContext = {
                 account: address,
-                gameSDK: GameSDK.connect(GAME_ADDRESS, signer),
-                chessSDK: ChessSDK.connect(CHESS_ADDRESS, signer),
+                gameSDK: GameSDK.connect(GAME_ADDRESS, sessionSigner!),
+                chessSDK: ChessSDK.connect(CHESS_ADDRESS, sessionSigner!),
                 reactivitySDK,
                 publicClient,
                 walletClient,
+                mainSigner: signer,
             };
 
             setAccount(address);
             setCtx(newCtx);
             setStatus('Wallet connected. Ready to play!');
+            return newCtx;
         } catch (err) {
             console.error(err);
             setStatus('Connection failed. Try again.');
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const ensureContext = async () => {
+        let currentCtx = ctx;
+        if (!currentCtx) {
+            currentCtx = await connectWallet();
+        }
+        if (!currentCtx) return null;
+
+        setLoading(true);
+        setStatus('Setting up session…');
+        try {
+            const sessionAddress = sessionWallet.address!;
+            const provider = new ethers.BrowserProvider(window.ethereum);
+
+            // 1. Check/Top up balance (0.3 SOM)
+            const balance = await provider.getBalance(sessionAddress);
+            if (balance < ethers.parseEther('0.1')) {
+                setStatus('Topping up session wallet…');
+                const tx = await currentCtx.mainSigner.sendTransaction({
+                    to: sessionAddress,
+                    value: ethers.parseEther('0.3')
+                });
+                await tx.wait();
+            }
+
+            // 2. Check/Authorize session
+            const gameSDKMain = GameSDK.connect(GAME_ADDRESS, currentCtx.mainSigner);
+            const authorizedMain = await gameSDKMain.sessionToMain(sessionAddress);
+            if (authorizedMain.toLowerCase() !== currentCtx.account.toLowerCase()) {
+                setStatus('Authorizing session wallet…');
+                const tx = await gameSDKMain.authorize(sessionAddress);
+                await tx.wait();
+            }
+            return currentCtx;
+        } catch (err) {
+            console.error('ensureContext error:', err);
+            setStatus('Setup failed. Check console.');
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateMatch = async () => {
+        const readyCtx = await ensureContext();
+        if (!readyCtx) return;
+
+        setLoading(true);
+        try {
+            setStatus('Creating new match…');
+            await readyCtx.gameSDK.createGame();
+            setStatus('Match created! Waiting for opponent…');
+        } catch (err) {
+            console.error('handleCreateMatch error:', err);
+            setStatus('Failed to create match.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleJoinMatch = async () => {
+        const idStr = prompt('Enter Game ID to join:');
+        if (!idStr) return;
+        const gameId = Number(idStr);
+        if (isNaN(gameId)) return;
+
+        const readyCtx = await ensureContext();
+        if (!readyCtx) return;
+
+        setLoading(true);
+        try {
+            setStatus(`Joining match #${gameId}…`);
+            const tx = await readyCtx.gameSDK.joinGame(gameId);
+            await tx.wait();
+            setStatus(`Joined match #${gameId}! Entering…`);
+            setTimeout(() => onEnterGame(readyCtx, gameId), 800);
+        } catch (err) {
+            console.error('handleJoinMatch error:', err);
+            setStatus('Failed to join match.');
         } finally {
             setLoading(false);
         }
@@ -184,7 +277,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
             ethCalls: [],
             eventContractSources: [GAME_ADDRESS],
             topicOverrides: [],
-            onData: (data) => {
+            onData: (data: any) => {
                 console.log('Data received:', data);
                 const result = data.result;
                 if (!result.topics || result.topics.length === 0) return;
@@ -233,7 +326,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                     }
                 }
             },
-        }).then((res) => {
+        }).then((res: any) => {
             console.log('Subscription result:', res);
             if (!(res instanceof Error)) {
                 unsub = () => res.unsubscribe();
@@ -244,64 +337,6 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
             if (unsub) unsub();
         };
     }, [ctx, onEnterGame])
-
-    const createGame = useCallback(async () => {
-
-        if (!ctx) return;
-        setLoading(true);
-        try {
-            setStatus('Sending createGame transaction…');
-            await ctx.gameSDK.createGame();
-            setStatus('Waiting for confirmation…');
-            // const receipt = await tx.wait();
-            // // Parse GameCreated event to extract game ID
-            // const iface = new ethers.Interface([
-            //     'event GameCreated(uint256 gameId, address player1)',
-            // ]);
-            // let gameId = 0;
-            // for (const log of receipt?.logs ?? []) {
-            //     try {
-            //         const parsed = iface.parseLog({ topics: [...log.topics], data: log.data });
-            //         if (parsed?.name === 'GameCreated') {
-            //             gameId = Number(parsed.args.gameId);
-            //             break;
-            //         }
-            //     } catch {
-            //         // not this log
-            //     }
-            // }
-
-
-
-            // setStatus(`Game #${gameId} created!`);
-            // onEnterGame(ctx, gameId);
-        } catch (err) {
-            console.error(err);
-            setStatus('Failed to create game.');
-        } finally {
-            setLoading(false);
-        }
-    }, [ctx, onEnterGame]);
-
-    const joinGame = useCallback(async () => {
-        const idStr = prompt('Enter Game ID to join:');
-        if (!idStr || !ctx) return;
-        const gameId = Number(idStr);
-        if (isNaN(gameId)) return;
-        setLoading(true);
-        try {
-            setStatus(`Joining game #${gameId}…`);
-            const tx = await ctx.gameSDK.joinGame(gameId);
-            await tx.wait();
-            setStatus(`Joined game #${gameId}!`);
-            onEnterGame(ctx, gameId);
-        } catch (err) {
-            console.error(err);
-            setStatus('Failed to join game.');
-        } finally {
-            setLoading(false);
-        }
-    }, [ctx, onEnterGame]);
 
     return (
         <div className="min-h-screen bg-neo-bg text-black flex flex-col items-center justify-center px-4 py-12">
@@ -334,28 +369,37 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                 </div>
 
                 {!account && !isWrongNetwork ? (
-                    <button
-                        onClick={connectWallet}
-                        disabled={loading}
-                        className="w-full neo-btn-cyan py-6 text-2xl"
-                    >
-                        CONNECT WALLET
-                    </button>
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleCreateMatch}
+                            disabled={loading}
+                            className="w-full neo-btn-lime py-6 text-2xl uppercase"
+                        >
+                            Create Match
+                        </button>
+                        <button
+                            onClick={handleJoinMatch}
+                            disabled={loading}
+                            className="w-full neo-btn-cyan py-4 text-xl uppercase"
+                        >
+                            Join ID
+                        </button>
+                    </div>
                 ) : isWrongNetwork ? (
                     <div className="space-y-4">
                         <button
                             onClick={switchNetwork}
                             disabled={loading}
-                            className="w-full neo-btn-pink py-6 text-xl"
+                            className="w-full neo-btn-pink py-6 text-xl uppercase"
                         >
-                            SWITCH NETWORK
+                            Switch Network
                         </button>
                         <button
                             onClick={addNetwork}
                             disabled={loading}
-                            className="w-full neo-btn bg-white py-4"
+                            className="w-full neo-btn bg-white py-4 uppercase"
                         >
-                            ADD NETWORK
+                            Add Network
                         </button>
                     </div>
                 ) : account ? (
@@ -370,7 +414,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                         </div>
 
                         <button
-                            onClick={createGame}
+                            onClick={handleCreateMatch}
                             disabled={loading || waitingGameId !== null}
                             className="w-full neo-btn-lime py-6 text-2xl uppercase"
                         >
@@ -378,7 +422,7 @@ export function LobbyView({ onEnterGame }: LobbyViewProps) {
                         </button>
 
                         <button
-                            onClick={joinGame}
+                            onClick={handleJoinMatch}
                             disabled={loading || waitingGameId !== null}
                             className="w-full neo-btn-pink py-4 text-xl uppercase"
                         >
